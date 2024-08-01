@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Markdown Blog</title>
+    <title>My MDX Blog</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/js-yaml/dist/js-yaml.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -20,8 +21,13 @@
             margin-bottom: 2rem;
         }
         #content {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .article-tile {
             background-color: white;
-            padding: 2rem;
+            padding: 1rem;
             border-radius: 5px;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
         }
@@ -29,61 +35,49 @@
 </head>
 <body>
     <header>
-        <h1>My Markdown Blog</h1>
+        <h1>My MDX Blog</h1>
     </header>
     <div id="content"></div>
 
     <script>
-    // Your markdown content goes here
-    const markdownContent = `
-# Welcome to My Blog
+    async function fetchMDXFiles() {
+        const response = await fetch('/articles/');
+        const html = await response.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const links = Array.from(doc.querySelectorAll('a'))
+            .filter(a => a.href.endsWith('.mdx'))
+            .map(a => a.href);
+        return links;
+    }
 
-This is a simple markdown blog. You can edit this content directly in the HTML file.
+    async function fetchMDXContent(url) {
+        const response = await fetch(url);
+        const content = await response.text();
+        const [, frontMatter, markdown] = content.split('---');
+        const metadata = jsyaml.load(frontMatter);
+        return { metadata, markdown };
+    }
 
-## Recent Posts
+    async function renderBlog() {
+        const mdxFiles = await fetchMDXFiles();
+        const contentDiv = document.getElementById('content');
 
-### My First Blog Post
+        for (const file of mdxFiles) {
+            const { metadata, markdown } = await fetchMDXContent(file);
+            const tile = document.createElement('div');
+            tile.className = 'article-tile';
+            tile.innerHTML = `
+                <h2>${metadata.title}</h2>
+                <p><em>Published on ${metadata.date}</em></p>
+                <p>${metadata.excerpt}</p>
+                <a href="${file}">Read more</a>
+            `;
+            contentDiv.appendChild(tile);
+        }
+    }
 
-*Published on August 1, 2024*
-
-Welcome to my first blog post! I'm excited to start sharing my thoughts and ideas with you all.
-
-#### Why I Started This Blog
-
-I've always been passionate about writing and sharing knowledge. This blog is my platform to:
-
-1. Express my ideas
-2. Connect with like-minded individuals
-3. Document my learning journey
-
-### Reflections on Technology
-
-*Published on August 5, 2024*
-
-As we move further into the 21st century, technology continues to shape our lives in profound ways. Today, I want to reflect on some of the most impactful technological trends and their implications for our future.
-
-#### Artificial Intelligence: Promise and Peril
-
-Artificial Intelligence (AI) has made significant strides in recent years. From natural language processing to computer vision, AI is transforming industries and our daily lives.
-
-**Benefits:**
-- Improved efficiency in various sectors
-- Personalized experiences for users
-- Advancements in medical diagnosis and treatment
-
-**Challenges:**
-- Ethical concerns around AI decision-making
-- Potential job displacement
-- Privacy and data security issues
-
-## About Me
-
-I'm a passionate writer and thinker, sharing my ideas through this blog. Feel free to explore my posts and reach out if you have any thoughts or questions!
-
-[Contact Me](mailto:youremail@example.com)
-    `;
-
-    document.getElementById('content').innerHTML = marked.parse(markdownContent);
+    renderBlog();
     </script>
 </body>
 </html>
